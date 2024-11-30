@@ -108,3 +108,105 @@
     (is-eq (len (filter validate-tag tags)) (len tags)) ;; All tags must be valid
   )
 )
+
+;; Public Functions
+
+;; Adds a new medical record with patient information
+(define-public (add-medical-record 
+  (patient-name (string-ascii 64))       ;; Patient's full name
+  (record-size uint)                     ;; Size of the medical record (in bytes)
+  (notes (string-ascii 128))             ;; Notes related to the medical record
+  (tags (list 10 (string-ascii 32)))     ;; Tags to categorize the record
+)
+  (let
+    (
+      (record-id (+ (var-get total-records) u1))  ;; Generate a new record ID
+    )
+    ;; Validations for the input parameters
+    (asserts! (> (len patient-name) u0) ERR_INVALID_NAME)  ;; Patient name cannot be empty
+    (asserts! (< (len patient-name) u65) ERR_INVALID_NAME) ;; Patient name length must be less than 65 characters
+    (asserts! (> record-size u0) ERR_INVALID_SIZE)         ;; Record size must be greater than zero
+    (asserts! (< record-size u1000000000) ERR_INVALID_SIZE) ;; Record size must be within a reasonable range
+    (asserts! (> (len notes) u0) ERR_INVALID_NAME)         ;; Notes cannot be empty
+    (asserts! (< (len notes) u129) ERR_INVALID_NAME)       ;; Notes length must be less than 129 characters
+    (asserts! (validate-tags tags) ERR_TAG_INVALID)        ;; Tags must be valid
+
+    ;; Insert the new medical record into the map
+    (map-insert medical-records
+      { record-id: record-id }
+      {
+        patient-name: patient-name,
+        physician-id: tx-sender,  ;; The current transaction sender is the physician
+        record-size: record-size,
+        creation-date: block-height,  ;; Store the block height as the creation date
+        notes: notes,
+        tags: tags
+      }
+    )
+
+    ;; Insert access permissions, initially granting access to the physician
+    (map-insert access-permissions
+      { record-id: record-id, user-id: tx-sender }
+      { is-access-granted: true }
+    )
+
+    ;; Update total record count
+    (var-set total-records record-id)
+    (ok record-id)  ;; Return the newly created record ID
+  )
+)
+
+;; Updates the physician associated with an existing medical record
+(define-public (update-record-physician (record-id uint) (new-physician principal))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Validations
+    (asserts! (record-exists? record-id) ERR_RECORD_NOT_FOUND)  ;; Ensure the record exists
+    (asserts! (is-eq (get physician-id record-data) tx-sender) ERR_NOT_AUTHORIZED) ;; Ensure the caller is authorized
+
+    ;; Update the physician ID for the record
+    (map-set medical-records
+      { record-id: record-id }
+      (merge record-data { physician-id: new-physician })
+    )
+    (ok true)  ;; Return success
+  )
+)
+
+(define-public (get-record-tags (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the list of tags associated with the record
+    (ok (get tags record-data))  ;; Return the tags associated with the record
+  )
+)
+
+(define-public (get-record-physician (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the physician ID associated with the record
+    (ok (get physician-id record-data))  ;; Return the physician ID
+  )
+)
+
+;; Retrieves the creation date (block height) of a medical record by its record ID
+(define-public (get-record-creation-date (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the creation date (block height) of the record
+    (ok (get creation-date record-data))  ;; Return the creation date of the record
+  )
+)
+
+(define-public (get-total-records)
+  ;; Returns the total number of medical records
+  (ok (var-get total-records))
+)
