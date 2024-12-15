@@ -175,6 +175,72 @@
   )
 )
 
+(define-public (get-record-tags (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the list of tags associated with the record
+    (ok (get tags record-data))  ;; Return the tags associated with the record
+  )
+)
+
+(define-public (get-record-physician (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the physician ID associated with the record
+    (ok (get physician-id record-data))  ;; Return the physician ID
+  )
+)
+
+;; Retrieves the creation date (block height) of a medical record by its record ID
+(define-public (get-record-creation-date (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the creation date (block height) of the record
+    (ok (get creation-date record-data))  ;; Return the creation date of the record
+  )
+)
+
+(define-public (get-total-records)
+  ;; Returns the total number of medical records
+  (ok (var-get total-records))
+)
+
+(define-public (get-record-size-by-id (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the size of the record
+    (ok (get record-size record-data))  ;; Return the size of the specified record
+  )
+)
+
+(define-public (get-record-notes (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the notes associated with the record
+    (ok (get notes record-data))  ;; Return the medical notes
+  )
+)
+
+(define-public (check-user-access (record-id uint) (user-id principal))
+  (let
+    (
+      (access-data (unwrap! (map-get? access-permissions { record-id: record-id, user-id: user-id }) ERR_PERMISSION_DENIED)) ;; Retrieve access data
+    )
+    ;; Return whether the user has access to the record
+    (ok (get is-access-granted access-data))  ;; Return the access status (true or false)
+  )
+)
+
 ;; Modifies the details of an existing medical record
 (define-public (update-medical-record 
   (record-id uint)                        ;; ID of the record to be updated
@@ -221,6 +287,19 @@
     (map-delete medical-records { record-id: record-id })
     (map-delete access-permissions { record-id: record-id, user-id: tx-sender })
     (ok true)  ;; Return success
+  )
+)
+
+;; Retrieves the details of a medical record by its record ID
+(define-public (get-medical-record 
+  (record-id uint)               ;; The record ID to retrieve details for
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))  ;; Retrieve the record data
+    )
+    ;; Return the record data
+    (ok record-data)  ;; Return the entire medical record data
   )
 )
 
