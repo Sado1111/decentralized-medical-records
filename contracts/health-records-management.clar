@@ -175,38 +175,85 @@
   )
 )
 
-(define-public (get-record-tags (record-id uint))
+;; Modifies the details of an existing medical record
+(define-public (update-medical-record 
+  (record-id uint)                        ;; ID of the record to be updated
+  (new-patient-name (string-ascii 64))     ;; New patient name
+  (new-size uint)                          ;; New size of the record
+  (new-notes (string-ascii 128))           ;; New notes for the record
+  (new-tags (list 10 (string-ascii 32)))   ;; New tags for the record
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the current record
+    )
+    ;; Validations
+    (asserts! (record-exists? record-id) ERR_RECORD_NOT_FOUND)  ;; Ensure the record exists
+    (asserts! (is-eq (get physician-id record-data) tx-sender) ERR_NOT_AUTHORIZED)  ;; Ensure the caller is authorized
+    (asserts! (> (len new-patient-name) u0) ERR_INVALID_NAME)  ;; Patient name cannot be empty
+    (asserts! (< (len new-patient-name) u65) ERR_INVALID_NAME) ;; Patient name must be less than 65 characters
+    (asserts! (> new-size u0) ERR_INVALID_SIZE)                ;; Record size must be greater than zero
+    (asserts! (< new-size u1000000000) ERR_INVALID_SIZE)       ;; Record size must be within a reasonable range
+    (asserts! (> (len new-notes) u0) ERR_INVALID_NAME)          ;; Notes cannot be empty
+    (asserts! (< (len new-notes) u129) ERR_INVALID_NAME)        ;; Notes length must be less than 129 characters
+    (asserts! (validate-tags new-tags) ERR_TAG_INVALID)         ;; Tags must be valid
+
+    ;; Update the medical record details
+    (map-set medical-records
+      { record-id: record-id }
+      (merge record-data { patient-name: new-patient-name, record-size: new-size, notes: new-notes, tags: new-tags })
+    )
+    (ok true)  ;; Return success
+  )
+)
+
+;; Deletes a specified medical record
+(define-public (delete-medical-record (record-id uint))
   (let
     (
       (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
     )
-    ;; Return the list of tags associated with the record
-    (ok (get tags record-data))  ;; Return the tags associated with the record
+    ;; Validations
+    (asserts! (record-exists? record-id) ERR_RECORD_NOT_FOUND)  ;; Ensure the record exists
+    (asserts! (is-eq (get physician-id record-data) tx-sender) ERR_NOT_AUTHORIZED)  ;; Ensure the caller is authorized
+
+    ;; Remove the medical record and associated access permissions
+    (map-delete medical-records { record-id: record-id })
+    (map-delete access-permissions { record-id: record-id, user-id: tx-sender })
+    (ok true)  ;; Return success
   )
 )
 
-(define-public (get-record-physician (record-id uint))
+;; Grants access to a specific medical record for a user
+(define-public (grant-access 
+  (record-id uint)               ;; Record ID to grant access for
+  (user principal)                ;; User to grant access to
+)
   (let
     (
-      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))  ;; Retrieve the record data
     )
-    ;; Return the physician ID associated with the record
-    (ok (get physician-id record-data))  ;; Return the physician ID
+    ;; Validations
+    (asserts! (record-exists? record-id) ERR_RECORD_NOT_FOUND)  ;; Ensure the record exists
+    (asserts! (is-eq (get physician-id record-data) tx-sender) ERR_NOT_AUTHORIZED) ;; Ensure only the physician can grant access
+
+    ;; New Validation: Ensure the user is authorized (for example, check if the user is a valid patient or has a specific role)
+    (asserts! (is-valid-user? user) ERR_PERMISSION_DENIED) ;; Example function to validate the user
+
+    ;; Grant access by setting permission to true
+    (map-insert access-permissions
+      { record-id: record-id, user-id: user }
+      { is-access-granted: true }
+    )
+    (ok true)  ;; Return success
   )
 )
 
-;; Retrieves the creation date (block height) of a medical record by its record ID
-(define-public (get-record-creation-date (record-id uint))
-  (let
-    (
-      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
-    )
-    ;; Return the creation date (block height) of the record
-    (ok (get creation-date record-data))  ;; Return the creation date of the record
+;; New helper function to validate the user
+(define-private (is-valid-user? (user principal))
+  (or
+    ;; Example checks (you can expand this logic as needed)
+    (is-eq user contract-owner) ;; Allow the contract owner (deployer) access
+    ;; You can add more conditions here depending on how you want to validate users
   )
-)
-
-(define-public (get-total-records)
-  ;; Returns the total number of medical records
-  (ok (var-get total-records))
 )
