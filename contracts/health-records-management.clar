@@ -303,6 +303,56 @@
   )
 )
 
+(define-public (get-record-patient-name (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the patient's name associated with the record
+    (ok (get patient-name record-data))  ;; Return the patient name
+  )
+)
+
+(define-public (get-record-tags-count (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the count of tags associated with the record
+    (ok (len (get tags record-data)))  ;; Return the count of tags
+  )
+)
+
+(define-public (get-patient-name (record-id uint))
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Retrieve the record data
+    )
+    ;; Return the patient name associated with the record
+    (ok (get patient-name record-data))  ;; Return the patient name
+  )
+)
+
+(define-public (get-user-access (record-id uint) (user-id principal))
+  (let
+    (
+      (access-data (unwrap! (map-get? access-permissions { record-id: record-id, user-id: user-id }) ERR_PERMISSION_DENIED)) ;; Retrieve access data
+    )
+    ;; Return the access permission status (true or false) for the user
+    (ok (get is-access-granted access-data))  ;; Return whether access is granted
+  )
+)
+
+(define-public (get-record-access-permission (record-id uint) (user-id principal))
+  (let
+    (
+      (access-data (unwrap! (map-get? access-permissions { record-id: record-id, user-id: user-id }) ERR_PERMISSION_DENIED)) ;; Retrieve access data
+    )
+    ;; Return whether the user has access to the record (true or false)
+    (ok (get is-access-granted access-data))  ;; Return the access permission status
+  )
+)
+
 ;; Grants access to a specific medical record for a user
 (define-public (grant-access 
   (record-id uint)               ;; Record ID to grant access for
@@ -336,3 +386,54 @@
     ;; You can add more conditions here depending on how you want to validate users
   )
 )
+
+;; Adds a Test Suite for Record Validation
+(define-public (test-record-validation (record-id uint))
+  (let
+    (
+      (record-data (map-get? medical-records { record-id: record-id })) ;; Retrieve the record data if it exists
+    )
+    (if (is-none record-data)
+      (ok false) ;; If no record exists, test fails
+      (ok true)  ;; If record exists, test passes
+    )
+  )
+)
+
+;; Updates specific details of a medical record while ensuring secure access.
+(define-public (update-record-details 
+  (record-id uint) 
+  (new-notes (string-ascii 128)) 
+  (new-tags (list 10 (string-ascii 32)))
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND)) ;; Fetch the record details.
+    )
+    ;; Ensure only the owner can make changes
+    (asserts! (is-physician-owner? record-id tx-sender) ERR_NOT_AUTHORIZED)
+
+    ;; Validate new inputs
+    (asserts! (validate-tags new-tags) ERR_TAG_INVALID)
+    (asserts! (< (len new-notes) u129) ERR_INVALID_NAME)
+
+    ;; Update the record
+    (map-set medical-records
+      { record-id: record-id }
+      (merge record-data { notes: new-notes, tags: new-tags })
+    )
+    (ok true) ;; Indicate successful update
+  )
+)
+
+;; Enhancing the contract with a user authentication method
+(define-public (authenticate-user (user-id principal))
+  (let
+    (
+      (user-permission (unwrap! (map-get? access-permissions { record-id: u1, user-id: user-id }) ERR_PERMISSION_DENIED)) ;; Check access
+    )
+    ;; Authentication check
+    (ok (get is-access-granted user-permission)) ;; Return access permission
+  )
+)
+
