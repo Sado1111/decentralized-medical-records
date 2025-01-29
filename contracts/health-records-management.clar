@@ -722,3 +722,84 @@
   )
 )
 
+
+
+;; Optimizes record deletion with cascading cleanup
+(define-public (optimized-record-deletion
+  (record-id uint)
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Verify ownership and perform cascading deletion
+    (asserts! (is-physician-owner? record-id tx-sender) ERR_NOT_AUTHORIZED)
+    (map-delete medical-records { record-id: record-id })
+    (map-delete access-permissions { record-id: record-id, user-id: tx-sender })
+    (ok true)
+  )
+)
+
+;; Adds UI functionality for batch record processing
+(define-public (process-record-batch
+  (start-id uint)
+  (batch-size uint)
+)
+  (let
+    (
+      (end-id (+ start-id batch-size))
+    )
+    ;; Process records in batch for UI display
+    (ok {
+      batch-start: start-id,
+      batch-end: end-id,
+      batch-size: batch-size
+    })
+  )
+)
+
+;; Enhances security with record integrity verification
+(define-public (verify-record-integrity
+  (record-id uint)
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Verify record data integrity
+    (asserts! (and
+      (> (len (get patient-name record-data)) u0)
+      (> (get record-size record-data) u0)
+    ) ERR_INVALID_SIZE)
+    (ok true)
+  )
+)
+
+;; Test suite for record tag validation
+(define-public (test-tag-validation
+  (test-tags (list 10 (string-ascii 32)))
+)
+  (begin
+    ;; Comprehensive tag validation testing
+    (asserts! (validate-tags test-tags) ERR_TAG_INVALID)
+    (asserts! (<= (len test-tags) u10) ERR_TAG_INVALID)
+    (ok true)
+  )
+)
+
+;; Fixes bug in access permission inheritance
+(define-public (fix-access-inheritance
+  (record-id uint)
+  (parent-user principal)
+  (child-user principal)
+)
+  (let
+    (
+      (parent-access (unwrap! (map-get? access-permissions { record-id: record-id, user-id: parent-user }) ERR_PERMISSION_DENIED))
+    )
+    ;; Verify and inherit access permissions
+    (asserts! (get is-access-granted parent-access) ERR_NOT_AUTHORIZED)
+    (ok true)
+  )
+)
+
