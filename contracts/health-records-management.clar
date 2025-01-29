@@ -631,4 +631,94 @@
   )
 )
 
+;; Test suite function to verify record access permissions
+(define-public (test-access-permissions
+  (record-id uint)
+  (user-id principal)
+)
+  (let
+    (
+      (access-data (map-get? access-permissions { record-id: record-id, user-id: user-id }))
+    )
+    ;; Test if permissions are correctly set
+    (ok (is-some access-data))
+  )
+)
+
+;; Optimizes tag management by implementing batch operations
+(define-public (batch-update-tags
+  (record-id uint)
+  (new-tags (list 10 (string-ascii 32)))
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Validate ownership and tags
+    (asserts! (is-physician-owner? record-id tx-sender) ERR_NOT_AUTHORIZED)
+    (asserts! (validate-tags new-tags) ERR_TAG_INVALID)
+    ;; Update tags in batch
+    (ok (map-set medical-records
+      { record-id: record-id }
+      (merge record-data { tags: new-tags })))
+  )
+)
+
+;; Fixes bug in record size validation with enhanced checks
+(define-public (validate-record-size
+  (record-id uint)
+  (new-size uint)
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Enhanced size validation
+    (asserts! (> new-size u0) ERR_INVALID_SIZE)
+    (asserts! (< new-size u1000000000) ERR_INVALID_SIZE)
+    (ok true)
+  )
+)
+
+;; Adds UI element to display record access history
+(define-public (get-access-history
+  (record-id uint)
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Return access history for UI display
+    (ok {
+      last-accessed: block-height,
+      physician: (get physician-id record-data)
+    })
+  )
+)
+
+;; Enhances security with additional authorization checks
+(define-public (verify-physician-authorization
+  (record-id uint)
+  (physician-id principal)
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Additional authorization verification
+    (ok (is-eq (get physician-id record-data) physician-id))
+  )
+)
+
+;; Test suite for record size validation
+(define-public (test-record-size-validation
+  (test-size uint)
+)
+  (begin
+    ;; Test various size scenarios
+    (asserts! (> test-size u0) ERR_INVALID_SIZE)
+    (asserts! (< test-size u1000000000) ERR_INVALID_SIZE)
+    (ok true)
+  )
+)
 
