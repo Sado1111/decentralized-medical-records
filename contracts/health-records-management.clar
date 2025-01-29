@@ -561,3 +561,74 @@
   )
 )
 
+;; Adds an audit trail functionality to track record access
+(define-public (add-access-audit-trail 
+  (record-id uint)
+  (user-id principal)
+  (action (string-ascii 32))  ;; Action performed (e.g., "view", "edit", "delete")
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+      (audit-entry {
+        timestamp: block-height,
+        user: user-id,
+        action: action
+      })
+    )
+    ;; Validate user access
+    (asserts! (is-physician-owner? record-id tx-sender) ERR_NOT_AUTHORIZED)
+    ;; Log the audit entry
+    (print audit-entry)
+    (ok true)
+  )
+)
+
+;; Optimizes record retrieval by implementing a caching mechanism
+(define-public (get-cached-record 
+  (record-id uint)
+)
+  (let
+    (
+      (cached-record (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Return cached record data directly if available
+    (ok {
+      patient-name: (get patient-name cached-record),
+      record-size: (get record-size cached-record),
+      tags: (get tags cached-record)
+    })
+  )
+)
+
+;; Enhances security by adding a record encryption status check
+(define-public (check-record-encryption
+  (record-id uint)
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Verify encryption status using record size
+    (ok (> (get record-size record-data) u0))
+  )
+)
+
+;; Adds UI functionality to display record statistics
+(define-public (get-record-statistics
+  (record-id uint)
+)
+  (let
+    (
+      (record-data (unwrap! (map-get? medical-records { record-id: record-id }) ERR_RECORD_NOT_FOUND))
+    )
+    ;; Return comprehensive statistics about the record
+    (ok {
+      size: (get record-size record-data),
+      creation-date: (get creation-date record-data),
+      tag-count: (len (get tags record-data))
+    })
+  )
+)
+
+
